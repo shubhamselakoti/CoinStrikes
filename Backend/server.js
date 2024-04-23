@@ -142,14 +142,22 @@ app.post("/remove", async function(req, res){
 
 
 
-app.post("/giveArray", async function(req,res){
-
+app.post("/giveArray", async function(req, res) {
     let userId = req.body.userId;
-    userId = userId.slice(1, -1);
-    let allCoins = await User.findOne({userEmail: userId});
-    console.log(allCoins);
-    return(res.send(allCoins))
-})
+
+    try {
+        let user = await User.findOne({ userEmail: userId });
+        if (!user) {
+            return res.status(404).send({ error: "User not found" });
+        }
+        let coins = user.coins || [];
+        console.log(coins);
+        res.send({ coins: coins, userName: user.userName });
+    } catch (error) {
+        console.error("Error fetching user coins:", error);
+        res.status(500).send({ error: "Internal server error" });
+    }
+});
 
 app.get("/", function(req, res){
     res.send("Hello, Welcome!!!")
