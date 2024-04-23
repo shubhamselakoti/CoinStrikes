@@ -110,10 +110,9 @@ app.post("/login", async function(req, res) {
 app.post("/add", async function(req,res){
     let coinId = req.body.coinsId;
     let userId = req.body.userId;
-    userId = userId.slice(1, -1);
-    ;
+    console.log(userId);
     let user = await User.findOne({userEmail: userId});
-    
+    console.log(user);
     if(user.coins.includes(coinId))
     {
         return(res.send("Coin Already Exist"));
@@ -130,13 +129,11 @@ app.post("/add", async function(req,res){
 app.post("/remove", async function(req, res){
     let coinId = req.body.coinsId;
     let userId = req.body.userId;
-    userId = userId.slice(1, -1);
 
     await User.updateOne(
         { "userEmail" : userId },
         { $pull: { "coins" : coinId } }
      );
-    
      return (res.send("Deleted!!!"));
 })
 
