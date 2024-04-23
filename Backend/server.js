@@ -181,6 +181,9 @@ app.post("/giveArray", async function(req,res){
 //     });
 // }
 
+app.get("/", function(req, res){
+    res.send("Hello, Welcome!!!")
+})
 
 
 let port = process.env.PORT;
