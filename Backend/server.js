@@ -48,8 +48,6 @@ async function ValidateEmail(email)
 }
 
 app.post("/register", async function(req, res){
-
-
     let name = req.body.name;
     let email = req.body.email;
     email = email.toLowerCase();
@@ -57,69 +55,53 @@ app.post("/register", async function(req, res){
 
     console.log("called here...");
     let customStatus = await ValidateEmail(email);
-    if(customStatus === 800)
-    {
-        res.send(customStatus)
+    
+    if(customStatus === 800) {
+        // Email format is invalid
+        res.status(400).send({ error: "Invalid email format" });
     } else {
-
-        
-        const user = new User ({
+        const user = new User({
             userName: name,
             userEmail: email,
             password: password
         });
 
-        User.exists({userEmail: email}, async function (err, isAlready) {
-            if (err){
-                console.log(err)
-            }else{
-                
-                if(isAlready === null)
-                {
+        User.exists({ userEmail: email }, async function (err, isAlready) {
+            if (err) {
+                console.log(err);
+            } else {
+                if (isAlready === null) {
                     await user.save();  
                     customStatus = 200;
                     res.send(email);
-                }
-                else
-                {
-                    customStatus = 801
-                    await res.send(customStatus);
+                } else {
+                    // User already exists
+                    res.status(409).send({ error: "User already exists" });
                 }
             }
-
-        });  
+        });
     }
-    
 });
 
 
 
 
 
-app.post("/login", async function(req,res){
-    let email = req.body.email;
-    email = email.toLowerCase();
-    let password = req.body.password;
-    let customStatus = 0;
-    let userDetails = await User.findOne({userEmail: email});
-    // console.log(userDetails);
-    
-    if(userDetails == null)
-    {
-        customStatus = 900;
-    } else if (userDetails.password != password) {
-        customStatus = 901;
-        // console.log(userDetails.password);
-    } else {
-        customStatus = 200;
-        return(
-            res.send(userDetails.userEmail)
-        )
-    }
-    return(
-        res.send(customStatus)
-    )
-})
+app.post("/login", async function(req, res) {
+  let email = req.body.email;
+  email = email.toLowerCase();
+  let password = req.body.password;
+  let customStatus = 0;
+  let userDetails = await User.findOne({ userEmail: email });
+
+  if (!userDetails) {
+    res.status(404).send({ error: "User not found" });
+  } else if (userDetails.password !== password) {
+    res.status(401).send({ error: "Incorrect password" });
+  } else {
+    res.status(200).send({ email: userDetails.userEmail });
+  }
+});
 
 
 
