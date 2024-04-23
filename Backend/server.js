@@ -9,6 +9,7 @@ const ejs = require('ejs')
 
 const app = express()
 app.use(express.json());
+app.set('view engine', 'ejs');
 
 app.use(cors())
 app.use(bodyParser.urlencoded({
@@ -46,10 +47,6 @@ async function ValidateEmail(email)
     }
 }
 
-app.get("/", function(req, res){
-    res.render("Hello");
-})
-
 app.post("/register", async function(req, res){
 
 
@@ -58,6 +55,7 @@ app.post("/register", async function(req, res){
     email = email.toLowerCase();
     let password = req.body.password;
 
+    console.log("called here...");
     let customStatus = await ValidateEmail(email);
     if(customStatus === 800)
     {
@@ -167,27 +165,30 @@ app.post("/giveArray", async function(req,res){
     let userId = req.body.userId;
     userId = userId.slice(1, -1);
     let allCoins = await User.findOne({userEmail: userId});
-    // console.log(allCoins);
+    console.log(allCoins);
     return(res.send(allCoins))
 })
-
-
-// if(process.env.NODE_ENV == "production")
-// {
-//     app.use(express.static("client/build"));
-//     const path = require("path");
-//     app.get("*", function(req, res){
-//         res.sendFile(path.resolve(__dirname, 'client', 'build', 'index.html'))
-//     });
-// }
 
 app.get("/", function(req, res){
     res.send("Hello, Welcome!!!")
 })
 
 
+if(process.env.NODE_ENV == "production")
+{
+    app.use(express.static("client/build"));
+    const path = require("path");
+    app.get("*", function(req, res){
+        res.sendFile(path.resolve(__dirname, 'client', 'build', 'index.html'))
+    });
+}
+
+
+
 let port = process.env.PORT;
 if (port == null || port == "") {
   port = 3001;
 }
-app.listen(port);
+app.listen(port, () =>{
+    console.log("Server started");
+});
