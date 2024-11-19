@@ -1,16 +1,23 @@
-require('dotenv').config()
-const express = require('express')
-const mongoose = require('mongoose')
-const bodyParser= require("body-parser")
-var cors = require('cors')
-const ejs = require('ejs')
+import dotenv from 'dotenv';
+dotenv.config(); // Configure environment variables
 
+import express from 'express';
+import mongoose from 'mongoose';
+import bodyParser from 'body-parser';
+import cors from 'cors';
+import ejs from 'ejs';
+import axios from 'axios';
+import * as cheerio from 'cheerio';
+import punycode from 'punycode';
+import fetch from 'node-fetch';
+import puppeteer from 'puppeteer';
 
 
 const app = express()
 app.use(express.json());
-app.set('view engine', 'ejs');
 
+app.set('view engine', 'ejs');
+mongoose.set('strictQuery', true);
 app.use(cors())
 app.use(bodyParser.urlencoded({
     extended: true
@@ -47,61 +54,83 @@ async function ValidateEmail(email)
     }
 }
 
+app.get("/", function(req, res){
+    res.send("Hello");
+})
+
 app.post("/register", async function(req, res){
+
+
     let name = req.body.name;
     let email = req.body.email;
     email = email.toLowerCase();
     let password = req.body.password;
 
-    console.log("called here...");
+    console.log("called Here");
     let customStatus = await ValidateEmail(email);
-    
-    if(customStatus === 800) {
-        // Email format is invalid
-        res.status(400).send({ error: "Invalid email format" });
+    if(customStatus === 800)
+    {
+        res.send(customStatus)
     } else {
-        const user = new User({
+
+        
+        const user = new User ({
             userName: name,
             userEmail: email,
             password: password
         });
 
-        User.exists({ userEmail: email }, async function (err, isAlready) {
-            if (err) {
-                console.log(err);
-            } else {
-                if (isAlready === null) {
+        User.exists({userEmail: email}, async function (err, isAlready) {
+            if (err){
+                console.log(err)
+            }else{
+                
+                if(isAlready === null)
+                {
                     await user.save();  
                     customStatus = 200;
                     res.send(email);
-                } else {
-                    // User already exists
-                    res.status(409).send({ error: "User already exists" });
+                }
+                else
+                {
+                    customStatus = 801
+                    await res.send(customStatus);
                 }
             }
-        });
+
+        });  
     }
+    
 });
 
 
 
 
 
-app.post("/login", async function(req, res) {
-  let email = req.body.email;
-  email = email.toLowerCase();
-  let password = req.body.password;
-  let customStatus = 0;
-  let userDetails = await User.findOne({ userEmail: email });
-
-  if (!userDetails) {
-    res.status(404).send({ error: "User not found" });
-  } else if (userDetails.password !== password) {
-    res.status(401).send({ error: "Incorrect password" });
-  } else {
-    res.status(200).send({ email: userDetails.userEmail });
-  }
-});
+app.post("/login", async function(req,res){
+    let email = req.body.email;
+    email = email.toLowerCase();
+    let password = req.body.password;
+    let customStatus = 0;
+    let userDetails = await User.findOne({userEmail: email});
+    // console.log(userDetails);
+    
+    if(userDetails == null)
+    {
+        customStatus = 900;
+    } else if (userDetails.password != password) {
+        customStatus = 901;
+        // console.log(userDetails.password);
+    } else {
+        customStatus = 200;
+        return(
+            res.send(userDetails.userEmail)
+        )
+    }
+    return(
+        res.send(customStatus)
+    )
+})
 
 
 
@@ -110,9 +139,10 @@ app.post("/login", async function(req, res) {
 app.post("/add", async function(req,res){
     let coinId = req.body.coinsId;
     let userId = req.body.userId;
-    console.log(userId);
+    userId = userId.slice(1, -1);
+    ;
     let user = await User.findOne({userEmail: userId});
-    console.log(user);
+    
     if(user.coins.includes(coinId))
     {
         return(res.send("Coin Already Exist"));
@@ -129,46 +159,81 @@ app.post("/add", async function(req,res){
 app.post("/remove", async function(req, res){
     let coinId = req.body.coinsId;
     let userId = req.body.userId;
+    userId = userId.slice(1, -1);
 
     await User.updateOne(
         { "userEmail" : userId },
         { $pull: { "coins" : coinId } }
      );
+    
      return (res.send("Deleted!!!"));
 })
 
 
 
-app.post("/giveArray", async function(req, res) {
+app.post("/giveArray", async function(req,res){
+
     let userId = req.body.userId;
-
-    try {
-        let user = await User.findOne({ userEmail: userId });
-        if (!user) {
-            return res.status(404).send({ error: "User not found" });
-        }
-        let coins = user.coins || [];
-        console.log(coins);
-        res.send({ coins: coins, userName: user.userName });
-    } catch (error) {
-        console.error("Error fetching user coins:", error);
-        res.status(500).send({ error: "Internal server error" });
-    }
-});
-
-app.get("/", function(req, res){
-    res.send("Hello, Welcome!!!")
+    userId = userId.slice(1, -1);
+    let allCoins = await User.findOne({userEmail: userId});
+    // console.log(allCoins);
+    return(res.send(allCoins))
 })
 
 
-if(process.env.NODE_ENV == "production")
-{
-    app.use(express.static("client/build"));
-    const path = require("path");
-    app.get("*", function(req, res){
-        res.sendFile(path.resolve(__dirname, 'client', 'build', 'index.html'))
-    });
-}
+
+
+
+app.get('/giveGraph', async (req, res) => {
+    const url = 'https://www.coingecko.com/?items=300';
+
+    try {
+        const browser = await puppeteer.launch({ headless: true });
+        const page = await browser.newPage();
+
+        // Set headers to mimic a real browser
+        await page.setExtraHTTPHeaders({
+            "Accept-Language": "en-US,en;q=0.9",
+        });
+
+        await page.setUserAgent(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
+        );
+
+        await page.goto(url, { waitUntil: 'domcontentloaded' });
+
+        // Get the page content
+        const content = await page.content();
+        const $ = cheerio.load(content);
+
+        let str = "7d chart";
+        const selector = `img[alt*="${str}"]`;
+
+        const images = [];
+        $(selector).each((index, img) => {
+            const src = $(img).attr("src");
+            const alt = $(img).attr("alt");
+            images.push({ src, alt });
+        });
+
+        await browser.close();
+        res.json(images);
+    } catch (err) {
+        console.error('Error fetching or parsing data:', err.message);
+        res.status(500).send('An error occurred');
+    }
+});
+
+
+
+// if(process.env.NODE_ENV == "production")
+// {
+//     app.use(express.static("client/build"));
+//     const path = require("path");
+//     app.get("*", function(req, res){
+//         res.sendFile(path.resolve(__dirname, 'client', 'build', 'index.html'))
+//     });
+// }
 
 
 
@@ -176,6 +241,4 @@ let port = process.env.PORT;
 if (port == null || port == "") {
   port = 3001;
 }
-app.listen(port, () =>{
-    console.log("Server started");
-});
+app.listen(port);
